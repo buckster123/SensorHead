@@ -886,7 +886,7 @@ main {
     <div class="card-header">
       <div class="card-title">
         <span class="indicator" style="background:var(--green); box-shadow:0 0 4px var(--green);"></span>
-        Nose — BME688 Environmental Sensor
+        Nose — BME688 + BSEC2 Air Intelligence
       </div>
       <button class="btn" onclick="refreshEnvironment()" style="font-size:10px;">READ</button>
     </div>
@@ -928,30 +928,38 @@ main {
           </div>
           <div class="gauge-label">Pressure</div>
         </div>
-        <!-- Gas Resistance -->
+        <!-- IAQ Index -->
         <div class="gauge">
           <div class="gauge-ring">
             <svg viewBox="0 0 120 120">
               <circle class="track" cx="60" cy="60" r="48" />
-              <circle class="fill" id="gauge-gas-fill" cx="60" cy="60" r="48"
+              <circle class="fill" id="gauge-iaq-fill" cx="60" cy="60" r="48"
                 stroke="var(--purple)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
             </svg>
-            <div class="gauge-value"><span id="val-gas">--</span><span class="gauge-unit">kΩ</span></div>
+            <div class="gauge-value"><span id="val-iaq">--</span></div>
           </div>
-          <div class="gauge-label">Air Quality</div>
+          <div class="gauge-label">IAQ Index</div>
         </div>
-        <!-- Altitude -->
+        <!-- CO2 Equivalent -->
         <div class="gauge">
           <div class="gauge-ring">
             <svg viewBox="0 0 120 120">
               <circle class="track" cx="60" cy="60" r="48" />
-              <circle class="fill" id="gauge-alt-fill" cx="60" cy="60" r="48"
+              <circle class="fill" id="gauge-co2-fill" cx="60" cy="60" r="48"
                 stroke="var(--orange)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
             </svg>
-            <div class="gauge-value"><span id="val-alt">--</span><span class="gauge-unit">m</span></div>
+            <div class="gauge-value"><span id="val-co2">--</span><span class="gauge-unit">ppm</span></div>
           </div>
-          <div class="gauge-label">Altitude</div>
+          <div class="gauge-label">CO₂ Equiv</div>
         </div>
+      </div>
+      <div id="bsec-status" style="margin-top:12px; padding:10px 16px; border:1px solid var(--border); border-radius:var(--radius); background:var(--bg-surface); font-size:11px; display:flex; gap:16px; flex-wrap:wrap; align-items:center;">
+        <span style="color:var(--text-muted); letter-spacing:2px;">BSEC2</span>
+        <span id="bsec-quality" style="color:var(--green); font-weight:600;">--</span>
+        <span style="color:var(--text-muted);">bVOC: <span id="bsec-bvoc" style="color:var(--cyan);">--</span> ppm</span>
+        <span style="color:var(--text-muted);">Gas: <span id="bsec-gas" style="color:var(--purple);">--</span> kΩ</span>
+        <span style="color:var(--text-muted);">Accuracy: <span id="bsec-accuracy" style="color:var(--gold);">--</span></span>
+        <span id="bsec-version" style="color:var(--text-muted); margin-left:auto; letter-spacing:1px;">--</span>
       </div>
     </div>
   </div>
@@ -1217,21 +1225,45 @@ async function refreshEnvironment() {
     const temp = data.temperature_c;
     const hum = data.humidity_pct;
     const pres = data.pressure_hpa;
-    const gas = data.gas_resistance_ohm;
-    const alt = data.altitude_m;
+    const iaq = data.iaq;
+    const co2 = data.co2_equivalent_ppm;
 
     document.getElementById('val-temp').textContent = temp.toFixed(1);
     document.getElementById('val-hum').textContent = hum.toFixed(0);
     document.getElementById('val-pres').textContent = pres.toFixed(0);
-    document.getElementById('val-gas').textContent = gas ? (gas / 1000).toFixed(1) : '--';
-    document.getElementById('val-alt').textContent = alt.toFixed(0);
+    document.getElementById('val-iaq').textContent = iaq != null ? iaq.toFixed(0) : '--';
+    document.getElementById('val-co2').textContent = co2 != null ? co2.toFixed(0) : '--';
 
-    // Gauge ranges: temp -10..50, hum 0..100, pres 950..1050, gas 0..50k, alt 0..500
+    // Gauge ranges: temp -10..50, hum 0..100, pres 950..1050, iaq 0..500, co2 400..2000
     setGauge('gauge-temp-fill', temp, -10, 50);
     setGauge('gauge-hum-fill', hum, 0, 100);
     setGauge('gauge-pres-fill', pres, 950, 1050);
-    setGauge('gauge-gas-fill', gas || 0, 0, 50000);
-    setGauge('gauge-alt-fill', alt, 0, 500);
+    setGauge('gauge-iaq-fill', iaq || 0, 0, 500);
+    setGauge('gauge-co2-fill', co2 || 400, 400, 2000);
+
+    // IAQ color: green=good, gold=moderate, magenta=bad
+    const iaqEl = document.getElementById('gauge-iaq-fill');
+    if (iaq <= 50) iaqEl.style.stroke = 'var(--green)';
+    else if (iaq <= 150) iaqEl.style.stroke = 'var(--gold)';
+    else iaqEl.style.stroke = 'var(--magenta)';
+
+    // BSEC status bar
+    const quality = data.air_quality || '--';
+    const qualityEl = document.getElementById('bsec-quality');
+    qualityEl.textContent = quality.toUpperCase().replace('_', ' ');
+    if (quality === 'excellent' || quality === 'good') qualityEl.style.color = 'var(--green)';
+    else if (quality.includes('light') || quality.includes('moderate')) qualityEl.style.color = 'var(--gold)';
+    else if (quality.includes('polluted')) qualityEl.style.color = 'var(--magenta)';
+
+    document.getElementById('bsec-bvoc').textContent = data.breath_voc_ppm != null ? data.breath_voc_ppm.toFixed(2) : '--';
+    document.getElementById('bsec-gas').textContent = data.raw_gas_resistance_ohm ? (data.raw_gas_resistance_ohm / 1000).toFixed(1) : '--';
+    document.getElementById('bsec-accuracy').textContent = data.iaq_accuracy_label || '--';
+    document.getElementById('bsec-version').textContent = data.bsec_version ? 'BSEC ' + data.bsec_version : '--';
+
+    // Color accuracy label
+    const accEl = document.getElementById('bsec-accuracy');
+    const accColors = { 'stabilizing': 'var(--gold)', 'uncertain': 'var(--orange)', 'calibrating': 'var(--cyan)', 'calibrated': 'var(--green)' };
+    accEl.style.color = accColors[data.iaq_accuracy_label] || 'var(--text-muted)';
 
   } catch (e) {
     toast('Environment: ' + e.message, true);
