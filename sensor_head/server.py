@@ -25,6 +25,7 @@ _config: SensorHeadConfig | None = None
 _env_sensor = None
 _camera_mgr = None
 _inference = None
+_thermal = None
 
 
 def _get_config() -> SensorHeadConfig:
@@ -61,6 +62,15 @@ def _get_inference():
     return _inference
 
 
+def _get_thermal():
+    """Lazy-init the thermal camera."""
+    global _thermal
+    if _thermal is None:
+        from sensor_head.hardware.thermal import ThermalCamera
+        _thermal = ThermalCamera(_get_config())
+    return _thermal
+
+
 # Create the FastMCP app
 mcp = FastMCP("SensorHead")
 
@@ -81,6 +91,36 @@ async def sense_environment() -> str:
     sensor = _get_env_sensor()
     result = await asyncio.to_thread(sensor.read)
     return json.dumps(result, indent=2)
+
+
+# ── Thermal ──────────────────────────────────────────────────────────
+
+@mcp.tool()
+async def sense_thermal() -> Image:
+    """Capture a thermal heatmap from the MLX90640 Far-Infrared camera.
+
+    Returns a colorized ironbow heatmap JPEG (320x240) showing the
+    32x24 thermal array. Colors range from black/blue (cold) through
+    red/orange (warm) to yellow/white (hot).
+
+    The MLX90640 detects temperatures from -40C to 300C with ~0.1C
+    resolution — great for detecting people, electronics, heat sources.
+    """
+    thermal = _get_thermal()
+    jpeg_bytes = await asyncio.to_thread(thermal.capture_heatmap)
+    return Image(data=jpeg_bytes, format="jpeg")
+
+
+@mcp.tool()
+async def read_thermal() -> str:
+    """Read raw thermal data from the MLX90640 sensor.
+
+    Returns JSON with temperature statistics (min, max, avg in Celsius),
+    pixel count, and read timing. Use sense_thermal for the visual heatmap.
+    """
+    thermal = _get_thermal()
+    result = await asyncio.to_thread(thermal.read_json)
+    return result
 
 
 # ── Vision ───────────────────────────────────────────────────────────
@@ -197,7 +237,7 @@ async def get_head_status() -> str:
     """
     config = _get_config()
     status = {
-        "server": "SensorHead v0.3.0",
+        "server": "SensorHead v0.4.0",
         "timestamp": time.time(),
     }
 
@@ -236,13 +276,15 @@ async def get_head_status() -> str:
     except Exception as e:
         status["environment"] = {"status": "error", "reason": str(e)}
 
-    # Thermal status (check if MLX90640 is on the bus)
-    if "i2c_devices" in status:
-        mlx_addr = f"0x{config.mlx90640_addr:02X}"
-        status["thermal"] = {
-            "status": "detected" if mlx_addr in status["i2c_devices"] else "not_detected",
-            "address": mlx_addr,
-        }
+    # Thermal status
+    try:
+        thermal = _get_thermal()
+        if thermal.available:
+            status["thermal"] = await asyncio.to_thread(thermal.get_status)
+        else:
+            status["thermal"] = {"status": "not_detected", "address": f"0x{config.mlx90640_addr:02X}"}
+    except Exception as e:
+        status["thermal"] = {"status": "error", "reason": str(e)}
 
     # Pan-tilt status
     if "i2c_devices" in status:
@@ -278,7 +320,7 @@ def main():
     """Entry point for the MCP server."""
     global _config
     _config = SensorHeadConfig()
-    logger.info("SensorHead MCP server starting (v0.2.0)")
+    logger.info("SensorHead MCP server starting (v0.4.0)")
     mcp.run()
 
 

@@ -411,6 +411,149 @@ main {
 }
 
 /* ================================================================
+   THERMAL PANEL
+   ================================================================ */
+.thermal-card { grid-column: span 2; }
+
+.thermal-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  align-items: start;
+}
+
+.thermal-feed-wrapper {
+  position: relative;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+  border: 1px solid var(--border);
+}
+
+.thermal-feed-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  image-rendering: pixelated;
+  transition: opacity 0.3s;
+}
+
+.thermal-feed-wrapper img.loading { opacity: 0.5; }
+
+.thermal-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+}
+
+.thermal-overlay .corner {
+  position: absolute;
+  width: 20px; height: 20px;
+  border-color: var(--orange);
+  border-style: solid;
+  border-width: 0;
+}
+
+.thermal-overlay .corner.tl { top: 8px; left: 8px; border-top-width: 2px; border-left-width: 2px; }
+.thermal-overlay .corner.tr { top: 8px; right: 8px; border-top-width: 2px; border-right-width: 2px; }
+.thermal-overlay .corner.bl { bottom: 8px; left: 8px; border-bottom-width: 2px; border-left-width: 2px; }
+.thermal-overlay .corner.br { bottom: 8px; right: 8px; border-bottom-width: 2px; border-right-width: 2px; }
+
+.thermal-label {
+  position: absolute;
+  top: 12px; left: 32px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--orange);
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 2px;
+}
+
+.thermal-timestamp {
+  position: absolute;
+  bottom: 12px; right: 32px;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.thermal-stats {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.thermal-stat-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.thermal-stat-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.thermal-stat-value {
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.thermal-stat-value.cold { color: #4488ff; }
+.thermal-stat-value.warm { color: var(--orange); }
+.thermal-stat-value.hot { color: var(--magenta); }
+.thermal-stat-value.avg { color: var(--gold); }
+
+.thermal-legend {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.thermal-legend-bar {
+  flex: 1;
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #000, #000080, #0000ff, #8000ff, #ff0080, #ff0000, #ff8000, #ffff00, #ffffff);
+}
+
+.thermal-legend-label {
+  font-size: 10px;
+  color: var(--text-muted);
+  min-width: 40px;
+}
+
+.thermal-legend-label.right { text-align: right; }
+
+.thermal-timing {
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+  text-align: center;
+  margin-top: 4px;
+}
+
+.thermal-timing span { color: var(--orange); }
+
+/* ================================================================
    AI INFERENCE PANEL
    ================================================================ */
 .ai-card { grid-column: span 2; }
@@ -596,7 +739,8 @@ main {
    ================================================================ */
 @media (max-width: 900px) {
   main { grid-template-columns: 1fr; }
-  .camera-card, .env-card, .status-card { grid-column: span 1; }
+  .camera-card, .env-card, .status-card, .thermal-card { grid-column: span 1; }
+  .thermal-body { grid-template-columns: 1fr; }
   .gauge-grid { grid-template-columns: repeat(3, 1fr); }
   .status-grid { grid-template-columns: repeat(2, 1fr); }
 }
@@ -621,7 +765,7 @@ main {
     <div class="logo-eye"></div>
     <div>
       <div class="logo-text">SensorHead</div>
-      <div class="logo-version">v0.2.0 — Physical Senses for Claude</div>
+      <div class="logo-version">v0.4.0 — Physical Senses for Claude</div>
     </div>
   </div>
   <div class="header-controls">
@@ -684,6 +828,56 @@ main {
     <div class="camera-actions">
       <button class="btn" onclick="captureNight()">CAPTURE</button>
       <span class="camera-res">2304 x 1296 @ 56fps // WIDE 120°</span>
+    </div>
+  </div>
+
+  <!-- Thermal Eye: MLX90640 -->
+  <div class="card thermal-card">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="indicator" style="background:var(--orange); box-shadow:0 0 4px var(--orange);"></span>
+        Center Eye — MLX90640 Thermal 32x24
+      </div>
+      <button class="btn" onclick="captureThermal()" style="font-size:10px;">CAPTURE</button>
+    </div>
+    <div class="card-body">
+      <div class="thermal-body">
+        <div>
+          <div class="thermal-feed-wrapper" id="feed-thermal">
+            <img id="img-thermal" src="" alt="Thermal Heatmap" />
+            <div class="thermal-overlay">
+              <div class="corner tl"></div><div class="corner tr"></div>
+              <div class="corner bl"></div><div class="corner br"></div>
+            </div>
+            <div class="thermal-label">MLX90640 // INFRARED</div>
+            <div class="thermal-timestamp" id="ts-thermal">--:--:--</div>
+          </div>
+          <div class="thermal-legend">
+            <span class="thermal-legend-label">COLD</span>
+            <div class="thermal-legend-bar"></div>
+            <span class="thermal-legend-label right">HOT</span>
+          </div>
+        </div>
+        <div class="thermal-stats">
+          <div class="thermal-stat-row">
+            <span class="thermal-stat-label">Min Temp</span>
+            <span class="thermal-stat-value cold" id="thermal-min">--°C</span>
+          </div>
+          <div class="thermal-stat-row">
+            <span class="thermal-stat-label">Max Temp</span>
+            <span class="thermal-stat-value hot" id="thermal-max">--°C</span>
+          </div>
+          <div class="thermal-stat-row">
+            <span class="thermal-stat-label">Average</span>
+            <span class="thermal-stat-value avg" id="thermal-avg">--°C</span>
+          </div>
+          <div class="thermal-stat-row">
+            <span class="thermal-stat-label">Resolution</span>
+            <span class="thermal-stat-value" style="color:var(--text-bright); font-size:16px;">32 x 24 px</span>
+          </div>
+          <div class="thermal-timing" id="thermal-timing"></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -963,6 +1157,55 @@ async function captureNight() {
 }
 
 /* ================================================================
+   THERMAL CAPTURE
+   ================================================================ */
+let capturingThermal = false;
+
+async function captureThermal() {
+  if (capturingThermal) return;
+  capturingThermal = true;
+  const img = document.getElementById('img-thermal');
+  img.classList.add('loading');
+
+  try {
+    // Fetch heatmap and data in parallel
+    const [heatmapResp, dataResp] = await Promise.all([
+      fetch('/api/thermal/heatmap?t=' + Date.now()),
+      fetch('/api/thermal/data?t=' + Date.now())
+    ]);
+
+    if (!heatmapResp.ok) throw new Error('Heatmap capture failed');
+    const blob = await heatmapResp.blob();
+    img.src = URL.createObjectURL(blob);
+    img.classList.remove('loading');
+    document.getElementById('ts-thermal').textContent = new Date().toLocaleTimeString();
+
+    if (dataResp.ok) {
+      const data = await dataResp.json();
+      if (!data.error) {
+        document.getElementById('thermal-min').textContent = data.min_c + '°C';
+        document.getElementById('thermal-max').textContent = data.max_c + '°C';
+        document.getElementById('thermal-avg').textContent = data.avg_c + '°C';
+
+        // Color-code based on values
+        const maxEl = document.getElementById('thermal-max');
+        maxEl.className = 'thermal-stat-value ' + (data.max_c > 35 ? 'hot' : data.max_c > 28 ? 'warm' : 'cold');
+
+        const timingEl = document.getElementById('thermal-timing');
+        timingEl.innerHTML = `Read time: <span>${data.read_time_ms}ms</span> · Pixels: <span>${data.rows * data.cols}</span>`;
+      }
+    }
+
+    toast('Thermal captured');
+  } catch (e) {
+    toast('Thermal: ' + e.message, true);
+    img.classList.remove('loading');
+  }
+
+  capturingThermal = false;
+}
+
+/* ================================================================
    ENVIRONMENT
    ================================================================ */
 async function refreshEnvironment() {
@@ -1020,7 +1263,7 @@ async function refreshStatus() {
 
     // Thermal
     const thermEl = document.getElementById('stat-thermal');
-    const thermOk = data.thermal?.status === 'detected';
+    const thermOk = data.thermal?.available === true;
     thermEl.textContent = thermOk ? 'ONLINE' : 'NOT WIRED';
     thermEl.className = 'status-item-value ' + (thermOk ? 'online' : 'warn');
 
@@ -1224,6 +1467,7 @@ function toggleAuto() {
     autoInterval = setInterval(() => {
       captureVisual();
       setTimeout(captureNight, 2500); // stagger to avoid simultaneous camera access
+      setTimeout(captureThermal, 4000); // stagger thermal after cameras
       refreshEnvironment();
     }, 8000);
     toast('Auto-refresh every 8s');
@@ -1238,6 +1482,7 @@ function toggleAuto() {
 function refreshAll() {
   captureVisual();
   setTimeout(captureNight, 2500);
+  setTimeout(captureThermal, 4000);
   refreshEnvironment();
   refreshStatus();
   toast('Refreshing all sensors...');

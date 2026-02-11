@@ -17,6 +17,7 @@ from sensor_head.config import SensorHeadConfig
 from sensor_head.hardware.cameras import CameraManager
 from sensor_head.hardware.environment import EnvironmentSensor
 from sensor_head.hardware.inference import InferenceEngine
+from sensor_head.hardware.thermal import ThermalCamera
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("sensor-head.dashboard")
@@ -25,11 +26,12 @@ config = SensorHeadConfig()
 camera_mgr = CameraManager(config)
 env_sensor = EnvironmentSensor(config)
 inference = InferenceEngine(config)
+thermal = ThermalCamera(config)
 
 # Track whether the inference engine currently holds the IMX500 camera
 _ai_active = False
 
-app = FastAPI(title="SensorHead Dashboard", version="0.3.0")
+app = FastAPI(title="SensorHead Dashboard", version="0.4.0")
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -80,7 +82,7 @@ async def api_status():
     """Full sensor head status."""
     from sensor_head.hardware.i2c_bus import I2CBus
 
-    status = {"server": "SensorHead v0.3.0", "timestamp": time.time()}
+    status = {"server": "SensorHead v0.4.0", "timestamp": time.time()}
 
     # I2C
     try:
@@ -107,6 +109,12 @@ async def api_status():
     except Exception as e:
         status["environment"] = {"error": str(e)}
 
+    # Thermal
+    try:
+        status["thermal"] = await asyncio.to_thread(thermal.get_status)
+    except Exception as e:
+        status["thermal"] = {"error": str(e)}
+
     # Cameras
     try:
         status["cameras"] = await asyncio.to_thread(camera_mgr.get_status)
@@ -125,6 +133,26 @@ async def api_status():
         pass
 
     return JSONResponse(status)
+
+
+@app.get("/api/thermal/heatmap")
+async def api_thermal_heatmap():
+    """Thermal heatmap JPEG from MLX90640."""
+    try:
+        jpeg = await asyncio.to_thread(thermal.capture_heatmap)
+        return Response(content=jpeg, media_type="image/jpeg")
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/thermal/data")
+async def api_thermal_data():
+    """Raw thermal data with stats from MLX90640."""
+    try:
+        result = await asyncio.to_thread(thermal.read)
+        return JSONResponse(result)
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
 
 
 @app.get("/api/detect")
