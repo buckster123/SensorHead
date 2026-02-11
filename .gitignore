@@ -7,3 +7,8 @@ build/
 .eggs/
 *.so
 /tmp/
+hailort.log
+
+# Bosch BSEC2 binary (licensed, must be downloaded separately)
+BOSCH_SOFTWARE/
+bme68x-build/
