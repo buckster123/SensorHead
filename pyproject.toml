@@ -1,0 +1,18 @@
+[project]
+name = "sensor-head"
+version = "0.1.0"
+description = "Raspberry Pi 5 sensor head MCP server for Claude Code"
+requires-python = ">=3.11"
+
+dependencies = [
+    "mcp>=1.26.0",
+    "smbus2>=0.4.3",
+    "adafruit-circuitpython-mlx90640",
+    "adafruit-servokit",
+    "bme68x",
+    "numpy",
+    "pillow",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "ruff"]

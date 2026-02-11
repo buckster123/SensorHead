@@ -1,0 +1,1253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SensorHead</title>
+<style>
+/* ================================================================
+   ROOT & RESET — CerebroCortex palette
+   ================================================================ */
+:root {
+  --bg-void: #030308;
+  --bg-deep: #080812;
+  --bg-main: #0c0c1a;
+  --bg-surface: #12122a;
+  --bg-card: #161635;
+  --bg-hover: #1e1e45;
+  --border: #1a1a40;
+  --border-glow: rgba(0,255,65,0.15);
+
+  --green: #00ff41;
+  --green-dim: #00cc33;
+  --green-bg: rgba(0,255,65,0.06);
+  --cyan: #00d4ff;
+  --cyan-dim: #0099bb;
+  --gold: #ffd700;
+  --magenta: #ff0055;
+  --purple: #9d4edd;
+  --orange: #ff6b35;
+
+  --text: #c8d0d8;
+  --text-bright: #e8f0f8;
+  --text-muted: #556;
+
+  --radius: 6px;
+  --glow-sm: 0 0 10px rgba(0,255,65,0.2);
+  --glow-md: 0 0 20px rgba(0,255,65,0.15);
+  --glow-lg: 0 0 40px rgba(0,255,65,0.1);
+  --scanline: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,255,65,0.02) 2px, rgba(0,255,65,0.02) 4px);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'JetBrains Mono', 'Fira Code', 'SF Mono', Consolas, monospace;
+  background: var(--bg-void);
+  color: var(--text);
+  overflow-x: hidden;
+  min-height: 100vh;
+}
+
+/* ================================================================
+   MATRIX RAIN
+   ================================================================ */
+#matrix-rain {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  z-index: 0;
+  opacity: 0.06;
+  pointer-events: none;
+}
+
+/* ================================================================
+   SCANLINE OVERLAY
+   ================================================================ */
+body::after {
+  content: '';
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: var(--scanline);
+  pointer-events: none;
+  z-index: 9999;
+}
+
+/* ================================================================
+   HEADER
+   ================================================================ */
+header {
+  position: relative;
+  z-index: 10;
+  background: var(--bg-deep);
+  border-bottom: 1px solid var(--border);
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.logo-group {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.logo-eye {
+  width: 44px; height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle, var(--cyan) 0%, transparent 70%);
+  display: flex; align-items: center; justify-content: center;
+  animation: pulse-glow 3s infinite;
+  box-shadow: 0 0 20px rgba(0,212,255,0.3);
+  position: relative;
+}
+
+.logo-eye::after {
+  content: '';
+  width: 14px; height: 14px;
+  border-radius: 50%;
+  background: var(--cyan);
+  box-shadow: 0 0 8px var(--cyan);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { box-shadow: 0 0 20px rgba(0,212,255,0.3); }
+  50% { box-shadow: 0 0 35px rgba(0,212,255,0.5); }
+}
+
+.logo-text {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  background: linear-gradient(90deg, var(--cyan), var(--green));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-transform: uppercase;
+}
+
+.logo-version {
+  font-size: 11px;
+  color: var(--text-muted);
+  letter-spacing: 2px;
+}
+
+.header-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 6px var(--green);
+  animation: blink 2s infinite;
+}
+
+.status-dot.offline { background: var(--magenta); box-shadow: 0 0 6px var(--magenta); }
+
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+.btn {
+  padding: 6px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 1px;
+}
+
+.btn:hover {
+  border-color: var(--cyan);
+  box-shadow: var(--glow-sm);
+  color: var(--text-bright);
+}
+
+.btn.active {
+  border-color: var(--green);
+  color: var(--green);
+  box-shadow: 0 0 10px rgba(0,255,65,0.2);
+}
+
+/* ================================================================
+   MAIN LAYOUT
+   ================================================================ */
+main {
+  position: relative;
+  z-index: 10;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto;
+  gap: 16px;
+  padding: 16px 24px;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+/* ================================================================
+   CARDS
+   ================================================================ */
+.card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+}
+
+.card-title {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.card-title .indicator {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+}
+
+.card-body {
+  padding: 16px;
+}
+
+/* ================================================================
+   CAMERA FEEDS
+   ================================================================ */
+.camera-card { grid-column: span 1; }
+
+.camera-feed-wrapper {
+  position: relative;
+  background: #000;
+  border-radius: 4px;
+  overflow: hidden;
+  aspect-ratio: 4/3;
+}
+
+.camera-feed-wrapper img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+  transition: opacity 0.3s;
+}
+
+.camera-feed-wrapper img.loading { opacity: 0.5; }
+
+.camera-overlay {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  pointer-events: none;
+}
+
+.camera-overlay .corner {
+  position: absolute;
+  width: 20px; height: 20px;
+  border-color: var(--cyan);
+  border-style: solid;
+  border-width: 0;
+}
+
+.camera-overlay .corner.tl { top: 8px; left: 8px; border-top-width: 2px; border-left-width: 2px; }
+.camera-overlay .corner.tr { top: 8px; right: 8px; border-top-width: 2px; border-right-width: 2px; }
+.camera-overlay .corner.bl { bottom: 8px; left: 8px; border-bottom-width: 2px; border-left-width: 2px; }
+.camera-overlay .corner.br { bottom: 8px; right: 8px; border-bottom-width: 2px; border-right-width: 2px; }
+
+.camera-overlay.noir .corner { border-color: var(--magenta); }
+
+.camera-label {
+  position: absolute;
+  top: 12px; left: 32px;
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 2px;
+}
+
+.camera-label.visual { color: var(--cyan); }
+.camera-label.noir { color: var(--magenta); }
+
+.camera-timestamp {
+  position: absolute;
+  bottom: 12px; right: 32px;
+  font-size: 10px;
+  color: var(--text-muted);
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+.camera-rec {
+  position: absolute;
+  top: 12px; right: 32px;
+  font-size: 10px;
+  color: var(--magenta);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(0,0,0,0.7);
+  border-radius: 2px;
+}
+
+.camera-rec .dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--magenta);
+  animation: blink 1s infinite;
+}
+
+.camera-actions {
+  padding: 10px 16px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--border);
+  background: var(--bg-surface);
+}
+
+.camera-actions .btn { font-size: 11px; }
+
+.camera-res {
+  font-size: 10px;
+  color: var(--text-muted);
+  margin-left: auto;
+  letter-spacing: 1px;
+}
+
+/* ================================================================
+   ENVIRONMENT GAUGES
+   ================================================================ */
+.env-card { grid-column: span 2; }
+
+.gauge-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 16px;
+}
+
+.gauge {
+  text-align: center;
+  padding: 12px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  transition: border-color 0.3s;
+}
+
+.gauge:hover {
+  border-color: var(--cyan);
+}
+
+.gauge-ring {
+  position: relative;
+  width: 100px; height: 100px;
+  margin: 0 auto 10px;
+}
+
+.gauge-ring svg {
+  width: 100%; height: 100%;
+  transform: rotate(-90deg);
+}
+
+.gauge-ring .track {
+  fill: none;
+  stroke: var(--bg-hover);
+  stroke-width: 6;
+}
+
+.gauge-ring .fill {
+  fill: none;
+  stroke-width: 6;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 1s ease;
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.gauge-value {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-bright);
+}
+
+.gauge-unit {
+  font-size: 10px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.gauge-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+/* ================================================================
+   AI INFERENCE PANEL
+   ================================================================ */
+.ai-card { grid-column: span 2; }
+
+.ai-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.ai-results {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+  padding: 12px;
+  min-height: 80px;
+  font-size: 12px;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.ai-results .detection {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ai-results .detection:last-child { border-bottom: none; }
+
+.ai-results .det-label {
+  color: var(--cyan);
+  font-weight: 600;
+  min-width: 100px;
+}
+
+.ai-results .det-score {
+  color: var(--green);
+  min-width: 50px;
+}
+
+.ai-results .pred-bar {
+  height: 6px;
+  background: var(--cyan);
+  border-radius: 3px;
+  box-shadow: 0 0 4px var(--cyan);
+  transition: width 0.5s ease;
+}
+
+.ai-results .pred-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 0;
+}
+
+.ai-results .pred-label {
+  min-width: 120px;
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.ai-results .pred-bar-bg {
+  flex: 1;
+  height: 6px;
+  background: var(--bg-hover);
+  border-radius: 3px;
+}
+
+.ai-results .pred-pct {
+  min-width: 50px;
+  text-align: right;
+  color: var(--green);
+  font-size: 11px;
+}
+
+.ai-perf {
+  margin-top: 8px;
+  font-size: 10px;
+  color: var(--text-muted);
+  letter-spacing: 1px;
+}
+
+.ai-perf span { color: var(--green); }
+
+.btn.ai-active {
+  border-color: var(--magenta);
+  color: var(--magenta);
+  box-shadow: 0 0 10px rgba(255,0,85,0.2);
+}
+
+/* ================================================================
+   STATUS PANEL
+   ================================================================ */
+.status-card { grid-column: span 2; }
+
+.status-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.status-item {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-surface);
+}
+
+.status-item-label {
+  font-size: 10px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+
+.status-item-value {
+  font-size: 14px;
+  color: var(--text-bright);
+  font-weight: 600;
+}
+
+.status-item-value.online { color: var(--green); }
+.status-item-value.offline { color: var(--magenta); }
+.status-item-value.warn { color: var(--gold); }
+
+.device-list {
+  list-style: none;
+  font-size: 12px;
+}
+
+.device-list li {
+  padding: 4px 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.device-list .addr {
+  color: var(--cyan);
+  font-weight: 600;
+}
+
+/* ================================================================
+   TOAST
+   ================================================================ */
+#toast {
+  position: fixed;
+  bottom: 24px; right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.toast-msg {
+  padding: 10px 16px;
+  background: var(--bg-card);
+  border: 1px solid var(--green);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--green);
+  box-shadow: var(--glow-sm);
+  animation: toast-in 0.3s ease;
+}
+
+.toast-msg.error {
+  border-color: var(--magenta);
+  color: var(--magenta);
+}
+
+@keyframes toast-in {
+  from { transform: translateX(100px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+
+/* ================================================================
+   RESPONSIVE
+   ================================================================ */
+@media (max-width: 900px) {
+  main { grid-template-columns: 1fr; }
+  .camera-card, .env-card, .status-card { grid-column: span 1; }
+  .gauge-grid { grid-template-columns: repeat(3, 1fr); }
+  .status-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* ================================================================
+   CUSTOM SCROLLBAR
+   ================================================================ */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: var(--bg-deep); }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--green-dim); }
+</style>
+</head>
+<body>
+
+<!-- Matrix Rain Canvas -->
+<canvas id="matrix-rain"></canvas>
+
+<!-- Header -->
+<header>
+  <div class="logo-group">
+    <div class="logo-eye"></div>
+    <div>
+      <div class="logo-text">SensorHead</div>
+      <div class="logo-version">v0.2.0 — Physical Senses for Claude</div>
+    </div>
+  </div>
+  <div class="header-controls">
+    <div class="status-dot" id="status-dot"></div>
+    <span id="status-label" style="font-size:11px; color:var(--green); letter-spacing:1px;">ONLINE</span>
+    <button class="btn" id="btn-auto" onclick="toggleAuto()">AUTO: OFF</button>
+    <button class="btn" onclick="refreshAll()">REFRESH ALL</button>
+  </div>
+</header>
+
+<!-- Main Content -->
+<main>
+
+  <!-- Left Eye: IMX500 -->
+  <div class="card camera-card">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="indicator" style="background:var(--cyan); box-shadow:0 0 4px var(--cyan);"></span>
+        Left Eye — IMX500 AI Camera
+      </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <div class="camera-feed-wrapper" id="feed-visual">
+        <img id="img-visual" src="" alt="IMX500 Feed" />
+        <div class="camera-overlay">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
+        <div class="camera-label visual">IMX500 // DAYLIGHT</div>
+        <div class="camera-rec" id="rec-visual" style="display:none;"><div class="dot"></div>CAPTURING</div>
+        <div class="camera-timestamp" id="ts-visual">--:--:--</div>
+      </div>
+    </div>
+    <div class="camera-actions">
+      <button class="btn" onclick="captureVisual()">CAPTURE</button>
+      <span class="camera-res">2028 x 1520 @ 30fps</span>
+    </div>
+  </div>
+
+  <!-- Right Eye: NoIR Wide -->
+  <div class="card camera-card">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="indicator" style="background:var(--magenta); box-shadow:0 0 4px var(--magenta);"></span>
+        Right Eye — IMX708 Wide NoIR
+      </div>
+    </div>
+    <div class="card-body" style="padding:0;">
+      <div class="camera-feed-wrapper" id="feed-night">
+        <img id="img-night" src="" alt="NoIR Feed" />
+        <div class="camera-overlay noir">
+          <div class="corner tl"></div><div class="corner tr"></div>
+          <div class="corner bl"></div><div class="corner br"></div>
+        </div>
+        <div class="camera-label noir">IMX708 // NIGHT VISION</div>
+        <div class="camera-rec" id="rec-night" style="display:none;"><div class="dot"></div>CAPTURING</div>
+        <div class="camera-timestamp" id="ts-night">--:--:--</div>
+      </div>
+    </div>
+    <div class="camera-actions">
+      <button class="btn" onclick="captureNight()">CAPTURE</button>
+      <span class="camera-res">2304 x 1296 @ 56fps // WIDE 120°</span>
+    </div>
+  </div>
+
+  <!-- Environment Gauges -->
+  <div class="card env-card">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="indicator" style="background:var(--green); box-shadow:0 0 4px var(--green);"></span>
+        Nose — BME688 Environmental Sensor
+      </div>
+      <button class="btn" onclick="refreshEnvironment()" style="font-size:10px;">READ</button>
+    </div>
+    <div class="card-body">
+      <div class="gauge-grid">
+        <!-- Temperature -->
+        <div class="gauge">
+          <div class="gauge-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="track" cx="60" cy="60" r="48" />
+              <circle class="fill" id="gauge-temp-fill" cx="60" cy="60" r="48"
+                stroke="var(--cyan)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
+            </svg>
+            <div class="gauge-value"><span id="val-temp">--</span><span class="gauge-unit">°C</span></div>
+          </div>
+          <div class="gauge-label">Temperature</div>
+        </div>
+        <!-- Humidity -->
+        <div class="gauge">
+          <div class="gauge-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="track" cx="60" cy="60" r="48" />
+              <circle class="fill" id="gauge-hum-fill" cx="60" cy="60" r="48"
+                stroke="var(--green)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
+            </svg>
+            <div class="gauge-value"><span id="val-hum">--</span><span class="gauge-unit">%</span></div>
+          </div>
+          <div class="gauge-label">Humidity</div>
+        </div>
+        <!-- Pressure -->
+        <div class="gauge">
+          <div class="gauge-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="track" cx="60" cy="60" r="48" />
+              <circle class="fill" id="gauge-pres-fill" cx="60" cy="60" r="48"
+                stroke="var(--gold)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
+            </svg>
+            <div class="gauge-value"><span id="val-pres">--</span><span class="gauge-unit">hPa</span></div>
+          </div>
+          <div class="gauge-label">Pressure</div>
+        </div>
+        <!-- Gas Resistance -->
+        <div class="gauge">
+          <div class="gauge-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="track" cx="60" cy="60" r="48" />
+              <circle class="fill" id="gauge-gas-fill" cx="60" cy="60" r="48"
+                stroke="var(--purple)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
+            </svg>
+            <div class="gauge-value"><span id="val-gas">--</span><span class="gauge-unit">kΩ</span></div>
+          </div>
+          <div class="gauge-label">Air Quality</div>
+        </div>
+        <!-- Altitude -->
+        <div class="gauge">
+          <div class="gauge-ring">
+            <svg viewBox="0 0 120 120">
+              <circle class="track" cx="60" cy="60" r="48" />
+              <circle class="fill" id="gauge-alt-fill" cx="60" cy="60" r="48"
+                stroke="var(--orange)" stroke-dasharray="301.6" stroke-dashoffset="301.6" />
+            </svg>
+            <div class="gauge-value"><span id="val-alt">--</span><span class="gauge-unit">m</span></div>
+          </div>
+          <div class="gauge-label">Altitude</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- AI Inference Panel -->
+  <div class="card ai-card">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="indicator" style="background:var(--magenta); box-shadow:0 0 4px var(--magenta);"></span>
+        IMX500 On-Chip AI — Zero CPU Load
+      </div>
+      <span id="ai-model-active" style="font-size:10px; color:var(--text-muted); letter-spacing:1px;">NO MODEL</span>
+    </div>
+    <div class="card-body">
+      <div class="ai-controls">
+        <button class="btn" id="btn-detect" onclick="runDetect()">DETECT OBJECTS</button>
+        <button class="btn" id="btn-classify" onclick="runClassify()">CLASSIFY SCENE</button>
+        <button class="btn" id="btn-pose" onclick="runPose()">ESTIMATE POSE</button>
+      </div>
+      <div class="ai-results" id="ai-results">
+        <span style="color:var(--text-muted);">Click a button to run on-chip AI inference...</span>
+      </div>
+      <div class="ai-perf" id="ai-perf"></div>
+    </div>
+  </div>
+
+  <!-- Status Panel -->
+  <div class="card status-card">
+    <div class="card-header">
+      <div class="card-title">
+        <span class="indicator" style="background:var(--gold); box-shadow:0 0 4px var(--gold);"></span>
+        System Status
+      </div>
+    </div>
+    <div class="card-body">
+      <div class="status-grid">
+        <div class="status-item">
+          <div class="status-item-label">Left Eye</div>
+          <div class="status-item-value" id="stat-imx500">detecting...</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">Right Eye</div>
+          <div class="status-item-value" id="stat-noir">detecting...</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">Nose (BME688)</div>
+          <div class="status-item-value" id="stat-env">detecting...</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">Center Eye (Thermal)</div>
+          <div class="status-item-value" id="stat-thermal">detecting...</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">I2C Bus</div>
+          <div class="status-item-value" id="stat-i2c">scanning...</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">Pan-Tilt</div>
+          <div class="status-item-value" id="stat-pantilt">detecting...</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">Memory</div>
+          <div class="status-item-value" id="stat-mem">--</div>
+        </div>
+        <div class="status-item">
+          <div class="status-item-label">Server</div>
+          <div class="status-item-value" id="stat-server">--</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Toast Container -->
+<div id="toast"></div>
+
+<script>
+/* ================================================================
+   MATRIX RAIN
+   ================================================================ */
+const canvas = document.getElementById('matrix-rain');
+const ctx = canvas.getContext('2d');
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+
+const chars = 'アイウエオカキクケコサシスセソタチツテト0123456789ABCDEF';
+const fontSize = 14;
+let columns = Math.floor(canvas.width / fontSize);
+let drops = Array(columns).fill(1);
+
+function drawMatrix() {
+  ctx.fillStyle = 'rgba(3,3,8,0.05)';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = '#00ff41';
+  ctx.font = fontSize + 'px monospace';
+  for (let i = 0; i < drops.length; i++) {
+    const char = chars[Math.floor(Math.random() * chars.length)];
+    ctx.fillText(char, i * fontSize, drops[i] * fontSize);
+    if (drops[i] * fontSize > canvas.height && Math.random() > 0.975) {
+      drops[i] = 0;
+    }
+    drops[i]++;
+  }
+}
+setInterval(drawMatrix, 50);
+
+window.addEventListener('resize', () => {
+  columns = Math.floor(canvas.width / fontSize);
+  drops = Array(columns).fill(1);
+});
+
+/* ================================================================
+   TOAST SYSTEM
+   ================================================================ */
+function toast(msg, isError = false) {
+  const el = document.createElement('div');
+  el.className = 'toast-msg' + (isError ? ' error' : '');
+  el.textContent = msg;
+  document.getElementById('toast').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+/* ================================================================
+   GAUGE HELPER
+   ================================================================ */
+const CIRCUMFERENCE = 2 * Math.PI * 48; // ~301.6
+
+function setGauge(id, value, min, max) {
+  const pct = Math.min(1, Math.max(0, (value - min) / (max - min)));
+  const offset = CIRCUMFERENCE * (1 - pct);
+  document.getElementById(id).style.strokeDashoffset = offset;
+}
+
+/* ================================================================
+   CAMERA CAPTURE
+   ================================================================ */
+let capturing = { visual: false, night: false };
+
+async function captureVisual() {
+  if (capturing.visual) return;
+  capturing.visual = true;
+  const rec = document.getElementById('rec-visual');
+  const img = document.getElementById('img-visual');
+  rec.style.display = 'flex';
+  img.classList.add('loading');
+
+  try {
+    const resp = await fetch('/api/capture/visual?t=' + Date.now());
+    if (resp.status === 409) {
+      // AI inference is using the IMX500 — skip silently
+      rec.textContent = 'AI ACTIVE';
+      rec.querySelector('.dot')?.remove();
+      img.classList.remove('loading');
+      capturing.visual = false;
+      setTimeout(() => { rec.style.display = 'none'; }, 1500);
+      return;
+    }
+    if (!resp.ok) throw new Error('Capture failed');
+    const blob = await resp.blob();
+    img.src = URL.createObjectURL(blob);
+    img.classList.remove('loading');
+    document.getElementById('ts-visual').textContent = new Date().toLocaleTimeString();
+    toast('Left eye captured');
+  } catch (e) {
+    toast('Left eye: ' + e.message, true);
+    img.classList.remove('loading');
+  }
+
+  rec.style.display = 'none';
+  rec.innerHTML = '<div class="dot"></div>CAPTURING';
+  capturing.visual = false;
+}
+
+async function captureNight() {
+  if (capturing.night) return;
+  capturing.night = true;
+  const rec = document.getElementById('rec-night');
+  const img = document.getElementById('img-night');
+  rec.style.display = 'flex';
+  img.classList.add('loading');
+
+  try {
+    const resp = await fetch('/api/capture/night?t=' + Date.now());
+    if (!resp.ok) throw new Error('Capture failed');
+    const blob = await resp.blob();
+    img.src = URL.createObjectURL(blob);
+    img.classList.remove('loading');
+    document.getElementById('ts-night').textContent = new Date().toLocaleTimeString();
+    toast('Right eye captured');
+  } catch (e) {
+    toast('Right eye: ' + e.message, true);
+    img.classList.remove('loading');
+  }
+
+  rec.style.display = 'none';
+  capturing.night = false;
+}
+
+/* ================================================================
+   ENVIRONMENT
+   ================================================================ */
+async function refreshEnvironment() {
+  try {
+    const resp = await fetch('/api/environment');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.reason || 'Sensor error');
+
+    const temp = data.temperature_c;
+    const hum = data.humidity_pct;
+    const pres = data.pressure_hpa;
+    const gas = data.gas_resistance_ohm;
+    const alt = data.altitude_m;
+
+    document.getElementById('val-temp').textContent = temp.toFixed(1);
+    document.getElementById('val-hum').textContent = hum.toFixed(0);
+    document.getElementById('val-pres').textContent = pres.toFixed(0);
+    document.getElementById('val-gas').textContent = gas ? (gas / 1000).toFixed(1) : '--';
+    document.getElementById('val-alt').textContent = alt.toFixed(0);
+
+    // Gauge ranges: temp -10..50, hum 0..100, pres 950..1050, gas 0..50k, alt 0..500
+    setGauge('gauge-temp-fill', temp, -10, 50);
+    setGauge('gauge-hum-fill', hum, 0, 100);
+    setGauge('gauge-pres-fill', pres, 950, 1050);
+    setGauge('gauge-gas-fill', gas || 0, 0, 50000);
+    setGauge('gauge-alt-fill', alt, 0, 500);
+
+  } catch (e) {
+    toast('Environment: ' + e.message, true);
+  }
+}
+
+/* ================================================================
+   STATUS
+   ================================================================ */
+async function refreshStatus() {
+  try {
+    const resp = await fetch('/api/status');
+    const data = await resp.json();
+
+    // Cameras
+    const cams = data.cameras || {};
+    const imxEl = document.getElementById('stat-imx500');
+    const noirEl = document.getElementById('stat-noir');
+    imxEl.textContent = cams.imx500_available ? 'ONLINE' : 'OFFLINE';
+    imxEl.className = 'status-item-value ' + (cams.imx500_available ? 'online' : 'offline');
+    noirEl.textContent = cams.noir_available ? 'ONLINE' : 'OFFLINE';
+    noirEl.className = 'status-item-value ' + (cams.noir_available ? 'online' : 'offline');
+
+    // Environment
+    const envEl = document.getElementById('stat-env');
+    const envOk = data.environment && !data.environment.error && data.environment.temperature_c;
+    envEl.textContent = envOk ? 'ONLINE' : (data.environment?.status || 'OFFLINE');
+    envEl.className = 'status-item-value ' + (envOk ? 'online' : 'offline');
+
+    // Thermal
+    const thermEl = document.getElementById('stat-thermal');
+    const thermOk = data.thermal?.status === 'detected';
+    thermEl.textContent = thermOk ? 'ONLINE' : 'NOT WIRED';
+    thermEl.className = 'status-item-value ' + (thermOk ? 'online' : 'warn');
+
+    // Pan-tilt
+    const ptEl = document.getElementById('stat-pantilt');
+    const ptOk = data.pan_tilt?.status === 'detected';
+    ptEl.textContent = ptOk ? 'ONLINE' : 'NOT WIRED';
+    ptEl.className = 'status-item-value ' + (ptOk ? 'online' : 'warn');
+
+    // I2C
+    const i2cEl = document.getElementById('stat-i2c');
+    const devCount = data.i2c_device_count || 0;
+    const addrs = data.i2c_devices ? Object.keys(data.i2c_devices).join(', ') : 'none';
+    i2cEl.textContent = devCount + ' device' + (devCount !== 1 ? 's' : '') + ' (' + addrs + ')';
+    i2cEl.className = 'status-item-value ' + (devCount > 0 ? 'online' : 'offline');
+
+    // Memory
+    const memEl = document.getElementById('stat-mem');
+    const sys = data.system || {};
+    if (sys.mem_total_mb && sys.mem_available_mb) {
+      const used = sys.mem_total_mb - sys.mem_available_mb;
+      memEl.textContent = used + ' / ' + sys.mem_total_mb + ' MB';
+      memEl.className = 'status-item-value ' + (sys.mem_available_mb < 500 ? 'warn' : 'online');
+    }
+
+    // Server
+    document.getElementById('stat-server').textContent = data.server || 'unknown';
+    document.getElementById('stat-server').className = 'status-item-value online';
+
+    // Global status dot
+    const allGood = cams.imx500_available && cams.noir_available && envOk;
+    const dot = document.getElementById('status-dot');
+    const label = document.getElementById('status-label');
+    dot.className = 'status-dot' + (allGood ? '' : ' offline');
+    label.textContent = allGood ? 'ONLINE' : 'DEGRADED';
+    label.style.color = allGood ? 'var(--green)' : 'var(--gold)';
+
+  } catch (e) {
+    document.getElementById('status-dot').className = 'status-dot offline';
+    document.getElementById('status-label').textContent = 'OFFLINE';
+    document.getElementById('status-label').style.color = 'var(--magenta)';
+  }
+}
+
+/* ================================================================
+   AI INFERENCE
+   ================================================================ */
+let aiRunning = false;
+
+function setAiRunning(btn, running) {
+  aiRunning = running;
+  document.querySelectorAll('.ai-controls .btn').forEach(b => {
+    b.disabled = running;
+    b.classList.remove('ai-active');
+  });
+  if (running && btn) btn.classList.add('ai-active');
+}
+
+async function runDetect() {
+  if (aiRunning) return;
+  const btn = document.getElementById('btn-detect');
+  const results = document.getElementById('ai-results');
+  const perf = document.getElementById('ai-perf');
+  setAiRunning(btn, true);
+  results.innerHTML = '<span style="color:var(--gold);">Loading EfficientDet onto IMX500... (~5s model swap)</span>';
+  perf.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/detect?confidence=0.3');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('ai-model-active').textContent = data.model || '';
+
+    if (data.detections && data.detections.length > 0) {
+      let html = '';
+      data.detections.forEach(d => {
+        const pct = (d.confidence * 100).toFixed(1);
+        html += `<div class="detection">
+          <span class="det-label">${d.label}</span>
+          <span class="det-score">${pct}%</span>
+          <div style="flex:1;"><div class="pred-bar" style="width:${pct}%"></div></div>
+        </div>`;
+      });
+      results.innerHTML = html;
+    } else {
+      results.innerHTML = '<span style="color:var(--text-muted);">No objects detected above threshold</span>';
+    }
+
+    if (data.performance) {
+      perf.innerHTML = `DNN: <span>${data.performance.dnn_ms}ms</span> · DSP: <span>${data.performance.dsp_ms}ms</span> · Total: <span>${data.performance.total_ms}ms</span> · ${data.count} object(s)`;
+    }
+    toast('Detection complete — ' + (data.count || 0) + ' objects');
+  } catch (e) {
+    results.innerHTML = `<span style="color:var(--magenta);">Error: ${e.message}</span>`;
+    toast('Detection failed: ' + e.message, true);
+  }
+  setAiRunning(null, false);
+}
+
+async function runClassify() {
+  if (aiRunning) return;
+  const btn = document.getElementById('btn-classify');
+  const results = document.getElementById('ai-results');
+  const perf = document.getElementById('ai-perf');
+  setAiRunning(btn, true);
+  results.innerHTML = '<span style="color:var(--gold);">Loading MobileNetV2 onto IMX500... (~5s model swap)</span>';
+  perf.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/classify?top_k=5');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('ai-model-active').textContent = data.model || '';
+
+    if (data.predictions && data.predictions.length > 0) {
+      const maxConf = data.predictions[0].confidence;
+      let html = '';
+      data.predictions.forEach(p => {
+        const pct = (p.confidence * 100).toFixed(1);
+        const barW = maxConf > 0 ? (p.confidence / maxConf * 100) : 0;
+        html += `<div class="pred-row">
+          <span class="pred-label">${p.label}</span>
+          <div class="pred-bar-bg"><div class="pred-bar" style="width:${barW}%; background:var(--purple); box-shadow:0 0 4px var(--purple);"></div></div>
+          <span class="pred-pct">${pct}%</span>
+        </div>`;
+      });
+      results.innerHTML = html;
+    } else {
+      results.innerHTML = '<span style="color:var(--text-muted);">No classification results</span>';
+    }
+
+    if (data.performance) {
+      perf.innerHTML = `DNN: <span>${data.performance.dnn_ms}ms</span> · DSP: <span>${data.performance.dsp_ms}ms</span> · Total: <span>${data.performance.total_ms}ms</span>`;
+    }
+    toast('Classification complete');
+  } catch (e) {
+    results.innerHTML = `<span style="color:var(--magenta);">Error: ${e.message}</span>`;
+    toast('Classification failed: ' + e.message, true);
+  }
+  setAiRunning(null, false);
+}
+
+async function runPose() {
+  if (aiRunning) return;
+  const btn = document.getElementById('btn-pose');
+  const results = document.getElementById('ai-results');
+  const perf = document.getElementById('ai-perf');
+  setAiRunning(btn, true);
+  results.innerHTML = '<span style="color:var(--gold);">Loading PoseNet onto IMX500... (~5s model swap)</span>';
+  perf.innerHTML = '';
+
+  try {
+    const resp = await fetch('/api/pose');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    document.getElementById('ai-model-active').textContent = data.model || '';
+
+    if (data.poses && data.poses.length > 0) {
+      const pose = data.poses[0];
+      const good = pose.keypoints.filter(k => k.score > -3).sort((a,b) => b.score - a.score);
+      let html = `<div style="color:var(--green);margin-bottom:8px;">People detected: ${data.people_detected} · Keypoints: ${pose.keypoints_detected}/17</div>`;
+      good.forEach(k => {
+        const color = k.score > 0 ? 'var(--green)' : k.score > -2 ? 'var(--gold)' : 'var(--text-muted)';
+        html += `<div class="detection">
+          <span class="det-label">${k.name}</span>
+          <span style="color:${color};min-width:60px;">score: ${k.score.toFixed(2)}</span>
+          <span style="color:var(--text-muted);">pos: (${k.x.toFixed(3)}, ${k.y.toFixed(3)})</span>
+        </div>`;
+      });
+      results.innerHTML = html;
+    } else {
+      results.innerHTML = '<span style="color:var(--text-muted);">No poses detected</span>';
+    }
+
+    if (data.performance) {
+      perf.innerHTML = `DNN: <span>${data.performance.dnn_ms}ms</span> · DSP: <span>${data.performance.dsp_ms}ms</span> · Total: <span>${data.performance.total_ms}ms</span>`;
+    }
+    toast('Pose estimation complete — ' + (data.people_detected || 0) + ' people');
+  } catch (e) {
+    results.innerHTML = `<span style="color:var(--magenta);">Error: ${e.message}</span>`;
+    toast('Pose estimation failed: ' + e.message, true);
+  }
+  setAiRunning(null, false);
+}
+
+/* ================================================================
+   AUTO-REFRESH
+   ================================================================ */
+let autoInterval = null;
+let autoOn = false;
+
+function toggleAuto() {
+  autoOn = !autoOn;
+  const btn = document.getElementById('btn-auto');
+  if (autoOn) {
+    btn.textContent = 'AUTO: ON';
+    btn.classList.add('active');
+    autoInterval = setInterval(() => {
+      captureVisual();
+      setTimeout(captureNight, 2500); // stagger to avoid simultaneous camera access
+      refreshEnvironment();
+    }, 8000);
+    toast('Auto-refresh every 8s');
+  } else {
+    btn.textContent = 'AUTO: OFF';
+    btn.classList.remove('active');
+    clearInterval(autoInterval);
+    toast('Auto-refresh off');
+  }
+}
+
+function refreshAll() {
+  captureVisual();
+  setTimeout(captureNight, 2500);
+  refreshEnvironment();
+  refreshStatus();
+  toast('Refreshing all sensors...');
+}
+
+/* ================================================================
+   INIT
+   ================================================================ */
+refreshStatus();
+refreshEnvironment();
+</script>
+</body>
+</html>

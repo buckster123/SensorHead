@@ -1,0 +1,12 @@
+#!/usr/bin/env bash
+# SensorHead MCP Server launcher
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VENV_PYTHON="${SCRIPT_DIR}/venv/bin/python"
+
+if [ -x "$VENV_PYTHON" ]; then
+    exec "$VENV_PYTHON" -m sensor_head.server "$@"
+else
+    exec python3 -m sensor_head.server "$@"
+fi
