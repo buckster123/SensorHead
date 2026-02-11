@@ -237,7 +237,7 @@ async def get_head_status() -> str:
     """
     config = _get_config()
     status = {
-        "server": "SensorHead v0.4.0",
+        "server": "SensorHead v0.4.1",
         "timestamp": time.time(),
     }
 
@@ -320,7 +320,7 @@ def main():
     """Entry point for the MCP server."""
     global _config
     _config = SensorHeadConfig()
-    logger.info("SensorHead MCP server starting (v0.4.0)")
+    logger.info("SensorHead MCP server starting (v0.4.1)")
     mcp.run()
 
 

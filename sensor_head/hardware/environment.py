@@ -15,6 +15,7 @@ import json
 import logging
 import threading
 import time
+from pathlib import Path
 
 from sensor_head.config import SensorHeadConfig
 
@@ -57,6 +58,8 @@ class EnvironmentSensor:
         self._bsec_active = False
         self._lock = threading.Lock()
         self._last_bsec_data: dict | None = None
+        self._last_state_save: float = 0.0
+        self._state_file = Path(config.data_dir) / "bsec_state.json"
 
     def _init_sensor(self) -> None:
         """Lazy-initialize the BME688 with BSEC2."""
@@ -74,6 +77,9 @@ class EnvironmentSensor:
             version = self._sensor.get_bsec_version()
             variant = self._sensor.get_variant()
             chip_id = self._sensor.get_chip_id()
+
+            # Restore saved calibration state before setting sample rate
+            self._load_state()
 
             # Set low-power sample rate (3s interval, good balance)
             self._sensor.set_sample_rate(bsec.BSEC_SAMPLE_RATE_LP)
@@ -112,6 +118,66 @@ class EnvironmentSensor:
             logger.error(f"BME688 raw fallback also failed: {e}")
 
         self._available = False
+
+    def _load_state(self) -> None:
+        """Restore BSEC calibration state from disk."""
+        if not self._state_file.exists():
+            logger.info("No saved BSEC state — starting fresh calibration")
+            return
+        try:
+            with open(self._state_file) as f:
+                saved = json.load(f)
+            state_list = saved.get("state")
+            if state_list and isinstance(state_list, list):
+                self._sensor.set_bsec_state(state_list)
+                age_s = time.time() - saved.get("saved_at", 0)
+                age_h = age_s / 3600
+                logger.info(
+                    f"Restored BSEC state ({len(state_list)} bytes, "
+                    f"accuracy was {saved.get('iaq_accuracy', '?')}, "
+                    f"saved {age_h:.1f}h ago)"
+                )
+        except Exception as e:
+            logger.warning(f"Failed to restore BSEC state: {e}")
+
+    def save_state(self) -> bool:
+        """Save current BSEC calibration state to disk."""
+        if not self._bsec_active or self._sensor is None:
+            return False
+        try:
+            state = self._sensor.get_bsec_state()
+            if not state:
+                return False
+            self._state_file.parent.mkdir(parents=True, exist_ok=True)
+            payload = {
+                "state": state,
+                "saved_at": time.time(),
+                "iaq_accuracy": (
+                    self._last_bsec_data.get("iaq_accuracy", 0)
+                    if self._last_bsec_data else 0
+                ),
+                "bsec_version": self._sensor.get_bsec_version(),
+            }
+            tmp = self._state_file.with_suffix(".tmp")
+            with open(tmp, "w") as f:
+                json.dump(payload, f)
+            tmp.rename(self._state_file)
+            self._last_state_save = time.time()
+            logger.info(
+                f"Saved BSEC state (accuracy={payload['iaq_accuracy']})"
+            )
+            return True
+        except Exception as e:
+            logger.warning(f"Failed to save BSEC state: {e}")
+            return False
+
+    def _maybe_save_state(self) -> None:
+        """Save state periodically if enough time has elapsed."""
+        if not self._bsec_active:
+            return
+        now = time.time()
+        if now - self._last_state_save >= self._config.bsec_save_interval:
+            self.save_state()
 
     @property
     def available(self) -> bool:
@@ -189,6 +255,9 @@ class EnvironmentSensor:
             iaq = data.get("iaq", 0)
             iaq_acc = data.get("iaq_accuracy", 0)
             band = _iaq_band(iaq)
+
+            # Persist calibration state periodically
+            self._maybe_save_state()
 
             result = {
                 # Compensated (BSEC-corrected) values
@@ -278,4 +347,10 @@ class EnvironmentSensor:
             status["bsec_version"] = self._sensor.get_bsec_version()
             status["variant"] = self._sensor.get_variant()
             status["chip_id"] = f"0x{self._sensor.get_chip_id():02X}"
+            status["state_file"] = str(self._state_file)
+            status["state_saved"] = self._state_file.exists()
+            if self._last_state_save > 0:
+                status["last_state_save_ago_s"] = round(
+                    time.time() - self._last_state_save
+                )
         return status

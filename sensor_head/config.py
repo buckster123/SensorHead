@@ -47,3 +47,9 @@ class SensorHeadConfig:
 
     # Thermal heatmap
     thermal_upscale_size: tuple[int, int] = (320, 240)
+
+    # Data directory for persistent state (BSEC calibration, etc.)
+    data_dir: str = "/home/hailo/claude-root/SensorHead/data"
+
+    # BSEC state save interval (seconds)
+    bsec_save_interval: int = 300  # 5 minutes

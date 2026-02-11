@@ -31,7 +31,7 @@ thermal = ThermalCamera(config)
 # Track whether the inference engine currently holds the IMX500 camera
 _ai_active = False
 
-app = FastAPI(title="SensorHead Dashboard", version="0.4.0")
+app = FastAPI(title="SensorHead Dashboard", version="0.4.1")
 
 STATIC_DIR = Path(__file__).parent / "static"
 
@@ -153,6 +153,25 @@ async def api_thermal_data():
         return JSONResponse(result)
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.get("/api/environment/save-state")
+async def api_save_bsec_state():
+    """Manually save BSEC calibration state to disk."""
+    try:
+        saved = await asyncio.to_thread(env_sensor.save_state)
+        if saved:
+            return JSONResponse({"status": "saved", "file": str(env_sensor._state_file)})
+        return JSONResponse({"status": "skipped", "reason": "BSEC not active"})
+    except Exception as e:
+        return JSONResponse({"error": str(e)}, status_code=500)
+
+
+@app.on_event("shutdown")
+async def shutdown_save_state():
+    """Save BSEC state before dashboard exits."""
+    logger.info("Dashboard shutting down — saving BSEC state...")
+    env_sensor.save_state()
 
 
 @app.get("/api/detect")
