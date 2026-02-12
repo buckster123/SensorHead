@@ -1,0 +1,16 @@
+[Unit]
+Description=SensorHead Cloud Bridge
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=hailo
+WorkingDirectory=/home/hailo/claude-root/SensorHead
+ExecStart=/home/hailo/claude-root/SensorHead/venv/bin/python -m sensor_head.bridge
+Restart=always
+RestartSec=10
+Environment=PYTHONPATH=/home/hailo/claude-root/SensorHead
+
+[Install]
+WantedBy=multi-user.target
