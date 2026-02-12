@@ -223,6 +223,12 @@ class ThermalCamera:
             normalized = max(0, min(255, normalized))
             pixels[col, row] = lut[normalized]
 
+        # Correct physical mount orientation:
+        # MLX90640 is mounted 90deg CCW, so rotate 90deg CW to fix vertical.
+        # Then flip horizontally to align with visual cameras (enables overlays).
+        img = img.rotate(-90, expand=True)  # 32x24 → 24x32
+        img = img.transpose(PILImage.FLIP_LEFT_RIGHT)
+
         # Upscale with nearest-neighbor to keep the thermal "pixel" look
         img = img.resize((width, height), PILImage.NEAREST)
 

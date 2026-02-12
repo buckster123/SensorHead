@@ -143,10 +143,11 @@ class CloudBridge:
                     delay = RECONNECT_DELAY  # Reset on successful connect
                     logger.info("Bridge connected to cloud")
 
-                    # Run command handler and telemetry pusher concurrently
+                    # Run command handler, telemetry pusher, and heartbeat concurrently
                     await asyncio.gather(
                         self._command_loop(ws),
                         self._telemetry_loop(ws),
+                        self._heartbeat_loop(ws),
                     )
             except asyncio.CancelledError:
                 break
@@ -329,6 +330,19 @@ class CloudBridge:
                         return {"spoken": False, "error": body}
         except Exception as e:
             return {"spoken": False, "error": str(e)}
+
+    async def _heartbeat_loop(self, ws):
+        """Application-level keepalive to prevent Railway proxy from dropping the connection.
+
+        Protocol-level WebSocket pings may not traverse Railway's edge proxy,
+        so we send JSON ping/pong messages that flow as regular data frames.
+        """
+        while self.running:
+            try:
+                await ws.send(json.dumps({"type": "ping"}))
+            except Exception:
+                break  # Connection lost — let the outer loop handle reconnect
+            await asyncio.sleep(25)
 
     async def _telemetry_loop(self, ws):
         """Push environment + thermal readings every TELEMETRY_INTERVAL seconds."""
