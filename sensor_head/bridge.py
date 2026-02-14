@@ -256,6 +256,9 @@ class CloudBridge:
             return data, "json"
 
         elif action == "capture_visual":
+            # Release inference engine first — it holds IMX500 open for AI
+            if self._inference is not None:
+                await asyncio.to_thread(self._inference.release)
             jpeg = await asyncio.to_thread(
                 self._get_cameras().capture_jpeg, "imx500"
             )

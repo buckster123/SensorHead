@@ -23,9 +23,11 @@ _IMX708_MODEL = "imx708_wide_noir"
 class CameraManager:
     """Manages both CSI cameras with capture-and-release pattern."""
 
+    # Class-level lock shared across ALL instances (bridge + sentinel)
+    _global_lock = threading.Lock()
+
     def __init__(self, config: SensorHeadConfig) -> None:
         self._config = config
-        self._lock = threading.Lock()
         self._camera_map: dict[str, int] | None = None
 
     def _discover_cameras(self) -> dict[str, int]:
@@ -60,8 +62,14 @@ class CameraManager:
         self._camera_map = mapping
         return mapping
 
-    def _capture(self, camera_num: int, resolution: tuple[int, int]) -> Image.Image:
-        """Open camera, capture a still, close camera. Returns PIL Image."""
+    def _capture(
+        self, camera_num: int, resolution: tuple[int, int], retries: int = 1
+    ) -> Image.Image:
+        """Open camera, capture a still, close camera. Returns PIL Image.
+
+        Retries once on init failure (handles contention with inference engine
+        or other CameraManager instances).
+        """
         from picamera2 import Picamera2
         from libcamera import Transform
 
@@ -69,26 +77,42 @@ class CameraManager:
         hflip = rot in (180, 270)
         vflip = rot in (180, 90)
 
-        picam2 = Picamera2(camera_num)
-        try:
-            still_config = picam2.create_still_configuration(
-                main={"size": resolution, "format": "RGB888"},
-                transform=Transform(hflip=hflip, vflip=vflip),
-            )
-            picam2.configure(still_config)
-            picam2.start()
-            time.sleep(self._config.ae_settle_time)
-            array = picam2.capture_array("main")
-            return Image.fromarray(array)
-        finally:
+        last_error = None
+        for attempt in range(1 + retries):
+            if attempt > 0:
+                logger.warning(
+                    f"Camera {camera_num} init retry {attempt}/{retries} "
+                    f"after: {last_error}"
+                )
+                time.sleep(1.5)
+
+            picam2 = Picamera2(camera_num)
             try:
-                picam2.stop()
-            except Exception:
-                pass
-            try:
-                picam2.close()
-            except Exception:
-                pass
+                still_config = picam2.create_still_configuration(
+                    main={"size": resolution, "format": "RGB888"},
+                    transform=Transform(hflip=hflip, vflip=vflip),
+                )
+                picam2.configure(still_config)
+                picam2.start()
+                time.sleep(self._config.ae_settle_time)
+                array = picam2.capture_array("main")
+                return Image.fromarray(array)
+            except RuntimeError as e:
+                last_error = e
+                logger.warning(f"Camera {camera_num} capture failed: {e}")
+            finally:
+                try:
+                    picam2.stop()
+                except Exception:
+                    pass
+                try:
+                    picam2.close()
+                except Exception:
+                    pass
+
+        raise RuntimeError(
+            f"Camera {camera_num} capture failed after {1 + retries} attempts: {last_error}"
+        )
 
     def capture_visual(self) -> Image.Image:
         """Capture from the IMX500 AI Camera (left eye, daylight).
@@ -96,7 +120,7 @@ class CameraManager:
         Returns a PIL Image at the configured IMX500 resolution.
         Raises RuntimeError if the camera is not available.
         """
-        with self._lock:
+        with CameraManager._global_lock:
             mapping = self._discover_cameras()
             if "imx500" not in mapping:
                 raise RuntimeError("IMX500 AI Camera not detected")
@@ -111,7 +135,7 @@ class CameraManager:
         Returns a PIL Image at the configured NoIR resolution.
         Raises RuntimeError if the camera is not available.
         """
-        with self._lock:
+        with CameraManager._global_lock:
             mapping = self._discover_cameras()
             if "noir" not in mapping:
                 raise RuntimeError("IMX708 Wide NoIR Camera not detected")

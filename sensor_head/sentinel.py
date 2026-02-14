@@ -290,15 +290,28 @@ class SentinelLoop:
             return None
 
     async def _ai_confirm(self) -> list[dict]:
-        """Run IMX500 object detection for trigger classification."""
+        """Run IMX500 object detection for trigger classification.
+
+        Releases the inference engine after use so the IMX500 camera
+        is available for manual captures and other operations.
+        """
         try:
+            inference = self._get_inference()
             result = await asyncio.to_thread(
-                self._get_inference().detect_objects,
+                inference.detect_objects,
                 self._config.ai_confidence,
             )
+            # Release IMX500 so it's available for manual captures
+            await asyncio.to_thread(inference.release)
             return result.get("detections", [])
         except Exception as e:
             logger.warning(f"Sentinel AI confirm failed: {e}")
+            # Ensure release even on failure
+            if self._inference is not None:
+                try:
+                    await asyncio.to_thread(self._inference.release)
+                except Exception:
+                    pass
             return []
 
     async def scan_once(self) -> SentinelEvent | None:
