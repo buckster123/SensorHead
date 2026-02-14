@@ -99,6 +99,27 @@ class CloudBridge:
         return self._thermal
 
     @staticmethod
+    def _crop_to_4_3(jpeg_bytes: bytes) -> bytes:
+        """Center-crop a wide-angle JPEG (16:9) to 4:3 aspect ratio.
+
+        For the IMX708 Wide NoIR (2304x1296 → 1728x1296), this aligns
+        the FOV with the IMX500 (4:3) for clean composite overlays.
+        """
+        from PIL import Image as PILImage
+
+        img = PILImage.open(io.BytesIO(jpeg_bytes))
+        w, h = img.size
+        target_w = int(h * 4 / 3)
+        if target_w >= w:
+            return jpeg_bytes  # Already 4:3 or narrower
+        left = (w - target_w) // 2
+        img = img.crop((left, 0, left + target_w, h))
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=BRIDGE_JPEG_QUALITY)
+        logger.debug(f"Cropped image {w}x{h} → {target_w}x{h} (4:3)")
+        return buf.getvalue()
+
+    @staticmethod
     def _resize_jpeg(jpeg_bytes: bytes, max_dim: int = BRIDGE_IMAGE_MAX_DIM) -> bytes:
         """Resize JPEG to fit within max_dim on longest side for cloud transit."""
         from PIL import Image as PILImage
@@ -231,6 +252,14 @@ class CloudBridge:
             jpeg = await asyncio.to_thread(
                 self._get_cameras().capture_jpeg, "noir"
             )
+            jpeg = self._resize_jpeg(jpeg)
+            return base64.b64encode(jpeg).decode(), "image_base64"
+
+        elif action == "capture_night_cropped":
+            jpeg = await asyncio.to_thread(
+                self._get_cameras().capture_jpeg, "noir"
+            )
+            jpeg = self._crop_to_4_3(jpeg)
             jpeg = self._resize_jpeg(jpeg)
             return base64.b64encode(jpeg).decode(), "image_base64"
 
