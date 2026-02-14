@@ -54,6 +54,7 @@ class CloudBridge:
         self._inference = None
         self._thermal = None
         self._hw_config = None
+        self._sentinel = None
 
     def _load_config(self) -> dict:
         """Load bridge configuration."""
@@ -97,6 +98,16 @@ class CloudBridge:
             from sensor_head.hardware.thermal import ThermalCamera
             self._thermal = ThermalCamera(self._get_hw_config())
         return self._thermal
+
+    def _get_sentinel(self):
+        if self._sentinel is None:
+            from sensor_head.sentinel import SentinelLoop
+            self._sentinel = SentinelLoop(self._get_hw_config())
+            # Share hardware instances so sentinel doesn't duplicate
+            self._sentinel._thermal = self._thermal
+            self._sentinel._inference = self._inference
+            self._sentinel._cameras = self._cameras
+        return self._sentinel
 
     @staticmethod
     def _crop_to_4_3(jpeg_bytes: bytes) -> bytes:
@@ -164,11 +175,12 @@ class CloudBridge:
                     delay = RECONNECT_DELAY  # Reset on successful connect
                     logger.info("Bridge connected to cloud")
 
-                    # Run command handler, telemetry pusher, and heartbeat concurrently
+                    # Run command handler, telemetry, heartbeat, and sentinel concurrently
                     await asyncio.gather(
                         self._command_loop(ws),
                         self._telemetry_loop(ws),
                         self._heartbeat_loop(ws),
+                        self._sentinel_loop(ws),
                     )
             except asyncio.CancelledError:
                 break
@@ -187,6 +199,8 @@ class CloudBridge:
         """Signal handler for graceful shutdown."""
         logger.info("Shutdown signal received")
         self.running = False
+        if self._sentinel:
+            self._sentinel.stop()
 
     async def _command_loop(self, ws):
         """Receive and execute commands from the cloud."""
@@ -296,9 +310,10 @@ class CloudBridge:
 
         elif action == "get_head_status":
             status = {
-                "version": "0.4.1",
+                "version": "0.5.0",
                 "bridge": "connected",
                 "sensors": {},
+                "sentinel": self._get_sentinel().get_status(),
             }
             try:
                 env = self._get_env()
@@ -336,6 +351,33 @@ class CloudBridge:
             result = await self._voice_speak(text, voice, speed)
             return result, "json"
 
+        # ── Sentinel commands ──
+
+        elif action == "sentinel_arm":
+            sentinel = self._get_sentinel()
+            sentinel.arm()
+            return sentinel.get_status(), "json"
+
+        elif action == "sentinel_disarm":
+            sentinel = self._get_sentinel()
+            sentinel.disarm()
+            return sentinel.get_status(), "json"
+
+        elif action == "sentinel_configure":
+            sentinel = self._get_sentinel()
+            sentinel.configure(params)
+            return sentinel.get_status(), "json"
+
+        elif action == "sentinel_load_preset":
+            sentinel = self._get_sentinel()
+            preset_name = params.get("preset", "default")
+            sentinel.load_preset(preset_name)
+            return sentinel.get_status(), "json"
+
+        elif action == "sentinel_status":
+            sentinel = self._get_sentinel()
+            return sentinel.get_status(), "json"
+
         else:
             raise ValueError(f"Unknown action: {action}")
 
@@ -372,6 +414,26 @@ class CloudBridge:
             except Exception:
                 break  # Connection lost — let the outer loop handle reconnect
             await asyncio.sleep(25)
+
+    async def _sentinel_loop(self, ws):
+        """Run sentinel monitoring loop, push alerts via WebSocket."""
+        from dataclasses import asdict
+
+        sentinel = self._get_sentinel()
+
+        async def push_alert(event):
+            alert_msg = {
+                "type": "alert",
+                "alert_type": f"sentinel_{event.event_type}",
+                "data": asdict(event),
+            }
+            await ws.send(json.dumps(alert_msg))
+            logger.info(
+                f"Sentinel alert pushed: {event.event_type} "
+                f"({event.changed_pixels}px, {event.thermal_delta}°C)"
+            )
+
+        await sentinel.run(push_alert)
 
     async def _telemetry_loop(self, ws):
         """Push environment + thermal readings every TELEMETRY_INTERVAL seconds."""
