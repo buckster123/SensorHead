@@ -3,7 +3,7 @@
 > **Physical senses for Claude Code** — give your AI eyes that see in darkness, a nose that smells the air, and a thermal gaze that reads heat signatures. Running on Raspberry Pi 5.
 
 <p align="center">
-  <img src="banner.jpg" alt="SensorHead" width="800"/>
+  <img src="banner.png" alt="SensorHead" width="800"/>
 </p>
 
 ---
