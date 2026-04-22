@@ -148,9 +148,9 @@ Then in Claude Code, just ask:
 
 - [ ] **Movement** — Oak pan-tilt mount, beefy servos, PCA9685 PWM driver
 - [ ] **The Face** — Wave 7 3D agent face on attached monitor via Three.js
-- [ ] **Cloud Bridge** — Connect to ApexAurum Cloud so remote agents can see through physical eyes
-- [ ] **Voice** — Networked TTS/STT via laptop local API or MCP (not on Pi)
-- [ ] **Autonomy** — Thermal motion detection, air quality alerts, custom IMX500 models
+- [x] **Cloud Bridge** — Connect to ApexAurum Cloud so remote agents can see through physical eyes
+- [x] **Voice** — Networked TTS/STT via laptop local API or MCP (not on Pi)
+- [x] **Autonomy** — Thermal motion detection, air quality alerts, custom IMX500 models - Sentinel mode
 - [ ] **Digital Nose v2** — Parallel heater profiles + scikit-learn eNose gas classification
 
 ---
