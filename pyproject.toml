@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "sensor-head"
 version = "0.1.0"
@@ -6,13 +10,29 @@ requires-python = ">=3.11"
 
 dependencies = [
     "mcp>=1.26.0",
+    # Dashboard HTTP server (sensor_head.dashboard is a FastAPI app run by uvicorn)
+    "fastapi",
+    "uvicorn",
     "smbus2>=0.4.3",
+    # CircuitPython/Blinka stack for I2C sensor access (board/busio + drivers)
+    "adafruit-blinka",
     "adafruit-circuitpython-mlx90640",
+    # BME688 without BSEC2 — raw T/RH/P/gas fallback (environment.py uses this when
+    # the proprietary `bme68x` BSEC2 build is unavailable). Keeps the base install
+    # functional on any machine.
+    "adafruit-circuitpython-bme680",
     "adafruit-servokit",
-    "bme68x",
     "numpy",
     "pillow",
 ]
 
 [project.optional-dependencies]
 dev = ["pytest", "ruff"]
+# Full BSEC2 air quality (IAQ / CO2-equivalent / VOC). `bme68x` compiles against
+# Bosch's proprietary, license-gated BSEC2 SDK, so it is NOT installable on a plain
+# machine — install it only where the SDK/egg is available. The dashboard degrades
+# gracefully to adafruit-circuitpython-bme680 (raw values, no IAQ) when it's absent.
+bsec = ["bme68x"]
+
+[tool.setuptools.packages.find]
+include = ["sensor_head*"]
