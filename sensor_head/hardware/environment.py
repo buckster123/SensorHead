@@ -149,6 +149,7 @@ class EnvironmentSensor:
     def save_state(self) -> bool:
         """Save current BSEC calibration state to disk."""
         self._last_save_error = None
+        self._init_sensor()
         if not self._bsec_active or self._sensor is None:
             self._last_save_error = "BSEC not active"
             return False
