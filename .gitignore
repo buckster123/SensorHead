@@ -12,3 +12,7 @@ hailort.log
 # Bosch BSEC2 binary (licensed, must be downloaded separately)
 BOSCH_SOFTWARE/
 bme68x-build/
+
+# BSEC calibration state is node-local — never commit a live blob
+data/bsec_state.json
+data/bsec_state.tmp
