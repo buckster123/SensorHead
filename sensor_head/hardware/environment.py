@@ -59,6 +59,7 @@ class EnvironmentSensor:
         self._lock = threading.Lock()
         self._last_bsec_data: dict | None = None
         self._last_state_save: float = 0.0
+        self._last_save_error: str | None = None
         self._state_file = Path(config.data_dir) / "bsec_state.json"
 
     def _init_sensor(self) -> None:
@@ -140,13 +141,22 @@ class EnvironmentSensor:
         except Exception as e:
             logger.warning(f"Failed to restore BSEC state: {e}")
 
+    @property
+    def last_save_error(self) -> str | None:
+        """Why the last save_state() returned False, if it did."""
+        return self._last_save_error
+
     def save_state(self) -> bool:
         """Save current BSEC calibration state to disk."""
+        self._last_save_error = None
+        self._init_sensor()
         if not self._bsec_active or self._sensor is None:
+            self._last_save_error = "BSEC not active"
             return False
         try:
             state = self._sensor.get_bsec_state()
             if not state:
+                self._last_save_error = "get_bsec_state returned empty"
                 return False
             self._state_file.parent.mkdir(parents=True, exist_ok=True)
             payload = {
@@ -164,10 +174,12 @@ class EnvironmentSensor:
             tmp.rename(self._state_file)
             self._last_state_save = time.time()
             logger.info(
-                f"Saved BSEC state (accuracy={payload['iaq_accuracy']})"
+                f"Saved BSEC state (accuracy={payload['iaq_accuracy']}) "
+                f"→ {self._state_file}"
             )
             return True
         except Exception as e:
+            self._last_save_error = str(e)
             logger.warning(f"Failed to save BSEC state: {e}")
             return False
 

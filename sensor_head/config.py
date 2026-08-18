@@ -1,6 +1,21 @@
 """Hardware configuration for SensorHead."""
 
-from dataclasses import dataclass
+import os
+from dataclasses import dataclass, field
+from pathlib import Path
+
+
+def default_data_dir() -> str:
+    """BSEC state and other persistent files.
+
+    Prefer SENSORHEAD_DATA_DIR. Otherwise use <repo>/data so a checkout
+    running as apex1 (or anyone else) does not try to write the old
+    hailo absolute path.
+    """
+    override = os.environ.get("SENSORHEAD_DATA_DIR")
+    if override:
+        return override
+    return str(Path(__file__).resolve().parent.parent / "data")
 
 
 @dataclass
@@ -49,7 +64,7 @@ class SensorHeadConfig:
     thermal_upscale_size: tuple[int, int] = (320, 240)
 
     # Data directory for persistent state (BSEC calibration, etc.)
-    data_dir: str = "/home/hailo/claude-root/SensorHead/data"
+    data_dir: str = field(default_factory=default_data_dir)
 
     # BSEC state save interval (seconds)
     bsec_save_interval: int = 300  # 5 minutes

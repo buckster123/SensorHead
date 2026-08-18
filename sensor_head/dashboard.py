@@ -162,7 +162,8 @@ async def api_save_bsec_state():
         saved = await asyncio.to_thread(env_sensor.save_state)
         if saved:
             return JSONResponse({"status": "saved", "file": str(env_sensor._state_file)})
-        return JSONResponse({"status": "skipped", "reason": "BSEC not active"})
+        reason = env_sensor.last_save_error or "save failed"
+        return JSONResponse({"status": "skipped", "reason": reason})
     except Exception as e:
         return JSONResponse({"error": str(e)}, status_code=500)
 
